@@ -4,7 +4,7 @@ var gl;
 var startPos, endPos, isDrawing = false, activeProjectiles = [], canvas;
 
 //  CONSTANTS
-const GRAVITY = -10;
+const GRAVITY = -1;
 const SHRAPNEL_LIFESPAN = 2; // must be given in seconds times 60 (which is the assumed refresh rate)
 
 //  MAIN
@@ -58,20 +58,14 @@ function render(){
     if(isDrawing){
         gl.bufferData(gl.ARRAY_BUFFER, flatten([startPos, endPos]), gl.STATIC_DRAW);
         gl.drawArrays(gl.LINES, 0, 2);
-    }else{
-        if(activeProjectiles.length != 0){
-            console.log(activeProjectiles[0].getPosition());
-        }
-       // gl.bufferData(gl.ARRAY_BUFFER, flatten(activeProjectiles.flatMap(x => x.getPosition())) , gl.STATIC_DRAW);
-       gl.bufferData(gl.ARRAY_BUFFER, vec2(0.0, 0.0), gl.STATIC_DRAW);
-            gl.drawArrays(gl.POINTS, 0, 1);
     }
-    /*const cemetery = activeProjectiles.filter(x => x.dead());
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(activeProjectiles.flatMap(x => x.getPosition())) , gl.STATIC_DRAW);
+    gl.drawArrays(gl.POINTS, 0, activeProjectiles.length);
+    const cemetery = activeProjectiles.filter(x => x.dead());
     const notYet = activeProjectiles.filter(x => !(x.dead()));
     const deadRockets = cemetery.filter(x => x instanceof Rocket);
     const newShrapnel = deadRockets.flatMap(generateRandomShrapnel); 
     activeProjectiles = notYet.concat(newShrapnel);
-    */
     requestAnimationFrame(render);
 }
 
@@ -117,7 +111,7 @@ class Projectile{
     }
 
     calculatePosition(){
-        return vec2(this.startPos[0] + (this.startVelocity[0] * this.getTime() + 0.5 * GRAVITY * Math.pow(this.getTime(), 2)), this.startPos[1] + (this.startVelocity[1] * this.getTime() + 0.5 * GRAVITY * Math.pow(this.getTime(), 2)));
+        return vec2(this.startPos[0] + this.startVelocity[0] * this.getTime(), this.startPos[1] + (this.startVelocity[1] * this.getTime() + 0.5 * GRAVITY * Math.pow(this.getTime(), 2)));
     }
 
     calculateVelocity(){
@@ -151,7 +145,7 @@ class Rocket extends Projectile{
 
 class Shrapnel extends Projectile{
     constructor(rocket){
-        super(rocket.getPosition(), vec2(rocket.getVelocity()[0] + Math.floor(Math.random() * 10) - 5, rocket.getVelocity()[1] + Math.floor(Math.random() * 10) - 5));
+        super(rocket.getPosition(), vec2(rocket.getVelocity()[0] + Math.random() - 0.5, rocket.getVelocity()[1] + Math.random() - 0.5));
         this.sweetEmbraceTime = SHRAPNEL_LIFESPAN;
     }
 
