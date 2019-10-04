@@ -1,13 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script id="vertex-shader" type="x-shader/x-vertex">
+<script id="lineVertex-shader" type="x-shader/x-vertex">
 attribute vec4 vPosition;
 void main(){
-    gl_Position = vPosition;
-    gl_PointSize = 3.0;    
+    gl_Position = vPosition;  
 }
 </script>
+
+<script id="rocketVertex-shader" type="x-shader/x-vertex">
+    precision mediump float;
+    
+    attribute vec2 vStartPosition;
+    attribute vec2 vStartVelocity;
+    attribute float vStartTime;
+    
+    uniform float mTime;
+    uniform float gravity;
+
+    void main(){
+        float xPos = vStartPosition[0] + vStartVelocity[0] * (mTime - vStartTime);
+        float yPos = vStartPosition[1] + vStartVelocity[1] * (mTime - vStartTime) + 0.5 * gravity * (mTime - vStartTime)*(mTime - vStartTime);
+
+        gl_Position.x = xPos;
+        gl_Position.y = yPos;
+        gl_Position.z = 0.0;
+        gl_Position.w = 1.0;
+
+        gl_PointSize = 5.0;
+    }
+</script>
+
 <script id="fragment-shader" type="x-shader/x-fragment">
 precision mediump float;
 void main() {

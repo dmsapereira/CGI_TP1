@@ -2,9 +2,12 @@
 var gl;
 
 var startPos, endPos, isDrawing = false, activeProjectiles = [], canvas;
+var linesProgram, rocketsProgram, linesBuffer, rocketBuffer;
+var linePosition, vStartPosition, vStartVelocity, vStartTime;
+var time = 0;
 
 //  CONSTANTS
-const GRAVITY = -1;
+const GRAVITY = -0.5;
 const SHRAPNEL_LIFESPAN = 2; // must be given in seconds times 60 (which is the assumed refresh rate)
 
 //  MAIN
@@ -20,20 +23,25 @@ window.onload = function init() {
     
     gl.viewport(0,0,canvas.width, canvas.height);
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
+    
     // Load shaders and initialize attribute buffers
-    var program = initShaders(gl, "vertex-shader", "fragment-shader");
-    gl.useProgram(program);
-
-    // Load the data into the GPU
-    var bufferId = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
-    gl.bufferData(gl.ARRAY_BUFFER, gl.FLOAT * 2, gl.STATIC_DRAW);
-
-    // Associate our shader variables with our data buffer
-    var vPosition = gl.getAttribLocation(program, "vPosition");
-    gl.vertexAttribPointer(vPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vPosition);
+    linesProgram = initShaders(gl, "lineVertex-shader", "fragment-shader");
+    rocketsProgram = initShaders(gl, "rocketVertex-shader", "fragment-shader");
+    linesBuffer = gl.createBuffer();
+    rocketBuffer = gl.createBuffer();
+    
+    linePosition = gl.getAttribLocation(linesProgram, "vPosition");
+    gl.enableVertexAttribArray(linePosition);    
+    
+    
+    vStartPosition = gl.getAttribLocation(rocketsProgram,"vStartPosition");
+    gl.enableVertexAttribArray(vStartPosition);
+    
+    vStartVelocity = gl.getAttribLocation(rocketsProgram,"vStartVelocity");
+    gl.enableVertexAttribArray(vStartVelocity);
+    
+    vStartTime = gl.getAttribLocation(rocketsProgram,"vStartTime");
+    gl.enableVertexAttribArray(vStartTime)
     render();
 }
 
@@ -53,30 +61,48 @@ function render() {
 }
 */
 
+function bindLine(){
+    gl.useProgram(linesProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, linesBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten([startPos, endPos]), gl.STATIC_DRAW);
+
+    // Associate our shader variables with our data buffer
+    gl.vertexAttribPointer(linePosition, 2, gl.FLOAT, false, 0, 0);
+}
+
+function bindRockets(){
+    gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
+    gl.useProgram(rocketsProgram);
+    console.log(flatten(activeProjectiles.flatMap(x => x.getInfo())));
+    gl.bufferData(gl.ARRAY_BUFFER,flatten(activeProjectiles.flatMap(x => x.getInfo())),gl.STATIC_DRAW);
+
+    gl.uniform1f(gl.getUniformLocation(rocketsProgram,"mTime"),time);
+    gl.uniform1f(gl.getUniformLocation(rocketsProgram,"gravity"), GRAVITY);
+    gl.vertexAttribPointer(vStartPosition,2,gl.FLOAT,false,20,0);
+    gl.vertexAttribPointer(vStartVelocity,2,gl.FLOAT,false,20,8);
+    gl.vertexAttribPointer(vStartTime,1,gl.FLOAT,false,20,16);
+    
+}
+
 function render(){
+    time += 1/60;
     gl.clear(gl.COLOR_BUFFER_BIT);
     if(isDrawing){
-        gl.bufferData(gl.ARRAY_BUFFER, flatten([startPos, endPos]), gl.STATIC_DRAW);
+        bindLine();
         gl.drawArrays(gl.LINES, 0, 2);
     }
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(activeProjectiles.flatMap(x => x.getPosition())) , gl.STATIC_DRAW);
+    //gl.bufferData(gl.ARRAY_BUFFER, flatten(activeProjectiles.flatMap(x => x.getPosition())) , gl.STATIC_DRAW);
+    bindRockets();
+
+    console.log(activeProjectiles.length);
     gl.drawArrays(gl.POINTS, 0, activeProjectiles.length);
     const cemetery = activeProjectiles.filter(x => x.dead());
     const notYet = activeProjectiles.filter(x => !(x.dead()));
     const deadRockets = cemetery.filter(x => x instanceof Rocket);
-    const newShrapnel = deadRockets.flatMap(generateRandomShrapnel); 
+    const newShrapnel = deadRockets.flatMap(x => x.getShrapnel); 
     activeProjectiles = notYet.concat(newShrapnel);
+
     requestAnimationFrame(render);
-}
-
-function generateRandomShrapnel(rocket){
-    var shrapnel = [];
-    var numberOfShrapnel = Math.floor(Math.random() * 240) + 10;
-    for( var i = 0; i < numberOfShrapnel; i++){
-        shrapnel.push(new Shrapnel(rocket));
-    }
-
-    return shrapnel;
 }
 
 
@@ -106,50 +132,84 @@ function mouseMovement(event){
 class Projectile{
     constructor(startPos, endPos){
         this.startPos = startPos;
-        this.startVelocity = vec2(endPos[0] - this.startPos[0], endPos[1] - this.startPos[1]);
-        this.time = -(1/60);
+        this.velocity = vec2(endPos[0] - startPos[0], endPos[1] - startPos[1]);
+        this.startTime = time;
     }
 
-    calculatePosition(){
-        return vec2(this.startPos[0] + this.startVelocity[0] * this.getTime(), this.startPos[1] + (this.startVelocity[1] * this.getTime() + 0.5 * GRAVITY * Math.pow(this.getTime(), 2)));
-    }
 
-    calculateVelocity(){
-        return vec2(this.startVelocity[0], this.startVelocity[1] + GRAVITY * this.getTime());
-    }
 
-    getPosition(){
-        this.time += 1/60;
-        return this.calculatePosition(this.getTime());
-    }
-
-    getVelocity(){
-        return this.calculateVelocity(this.getTime());
+    getInfo(){
+        return [this.startPos[0],this.startPos[1],this.velocity[0],this.velocity[1],this.startTime];
     }
 
     getTime(){
-        return this.time;
+        return this.startTime;
+    }
+
+    getStartPos(){
+        return this.startPos;
+    }
+
+    getStartVelocity(){
+        return this.velocity;
     }
 }
 
 class Rocket extends Projectile{
     constructor(startPos, endPos){
         super(startPos, endPos);
-        this.explosionTime = -(endPos[1] - startPos[1]) / GRAVITY; //we calculate when the velocity in the Y component is 0 ^^
+        this.explosionTime = this.getTime() + ((endPos[1] - startPos[1]) / GRAVITY); //we calculate when the velocity in the Y component is 0 ^^
+        this.explosionPos = this.calculateExplosionPos();
+        this.explosionVel = this.calculateExplosionVelocity();
+        this.shrapnel = [];
+        this.generateRandomShrapnel();
     }
 
     dead(){
         return this.getTime() >= this.explosionTime;    
     }
+
+    calculateExplosionPos(){
+        let x = this.getStartPos()[0] + this.getStartVelocity()[0]*this.explosionTime;
+        let y = this.getStartPos()[1] + this.getStartVelocity()[1]*this.explosionTime + 0.5 * GRAVITY * Math.pow(this.explosionTime,2.0);
+    
+        return vec2(x,y);
+    }
+
+    getDeathPosition(){
+        return this.explosionPos;
+    }
+    
+    calculateExplosionVelocity(){
+       let vx = this.getStartVelocity()[0];
+       let vy = this.getStartVelocity()[1] + GRAVITY * this.explosionTime;
+    
+       return vec2(vx,vy);
+    }
+
+    getDeathVelocity(){
+        return this.explosionVel;
+    }
+
+    generateRandomShrapnel(){
+        var numberOfShrapnel = Math.floor(Math.random() * 240) + 10;
+        for( var i = 0; i < numberOfShrapnel; i++){
+           this.shrapnel.push(new Shrapnel(this));
+        }
+    }
+
+    getShrapnel(){
+        return this.shrapnel;
+    }
 }
 
 class Shrapnel extends Projectile{
     constructor(rocket){
-        super(rocket.getPosition(), vec2(rocket.getVelocity()[0] + Math.random() - 0.5, rocket.getVelocity()[1] + Math.random() - 0.5));
-        this.sweetEmbraceTime = SHRAPNEL_LIFESPAN;
+        super(rocket.getDeathPosition(), vec2(rocket.getDeathVelocity()[0] + (Math.random()*2 - 1), rocket.getDeathVelocity()[1] + (Math.random()*2 - 1)));
+        this.lifespan = SHRAPNEL_LIFESPAN;
     }
 
     dead(){ //NANI
-        return this.getTime() >= this.sweetEmbraceTime;
+        return this.getTime() >= this.lifespan;
     }
 }
