@@ -4,9 +4,17 @@
 <script id="lineVertex-shader" type="x-shader/x-vertex">
 attribute vec4 vPosition;
 void main(){
-    gl_Position = vPosition;  
+    gl_Position = vPosition;
 }
 </script>
+
+<script id="lineStartVertex-shader" type="x-shader/x-vertex">
+    attribute vec4 vPosition;
+    void main(){
+        gl_Position = vPosition;
+        gl_PointSize = 5.0;
+    }
+    </script>
 
 <script id="rocketVertex-shader" type="x-shader/x-vertex">
     precision mediump float;
@@ -14,9 +22,12 @@ void main(){
     attribute vec2 vStartPosition;
     attribute vec2 vStartVelocity;
     attribute float vStartTime;
+    attribute vec4 vColor;
     
     uniform float mTime;
     uniform float gravity;
+
+    varying vec4 fColor;
 
     void main(){
         float xPos = vStartPosition[0] + vStartVelocity[0] * (mTime - vStartTime);
@@ -28,15 +39,39 @@ void main(){
         gl_Position.w = 1.0;
 
         gl_PointSize = 5.0;
+
+        fColor = vColor;
     }
 </script>
 
-<script id="fragment-shader" type="x-shader/x-fragment">
-precision mediump float;
+<script id="projectileFragment-shader" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec4 fColor;
+
 void main() {
-    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+    gl_FragColor = fColor;
 }
+
 </script>
+
+<script id="lineStartFragment-shader" type="x-shader/x-fragment">
+    precision mediump float;
+
+void main() {
+    gl_FragColor = vec4(1.0,0.0,0.0,1.0);
+}
+
+</script>
+
+<script id="lineFragment-shader" type="x-shader/x-fragment">
+    precision mediump float;
+    void main() {
+        gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0);
+    }
+    
+</script>
+
 <script type="text/javascript" src="../Common/webgl-utils.js"></script>
 <script type="text/javascript" src="../Common/initShaders.js"></script>
 <script type="text/javascript" src="../Common/MV.js"></script>
