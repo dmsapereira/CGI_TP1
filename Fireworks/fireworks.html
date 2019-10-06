@@ -23,6 +23,7 @@ void main(){
     attribute vec2 vStartVelocity;
     attribute float vStartTime;
     attribute vec4 vColor;
+    attribute float isShrapnel;
     
     uniform float mTime;
     uniform float gravity;
@@ -30,17 +31,25 @@ void main(){
     varying vec4 fColor;
 
     void main(){
+        gl_PointSize = 3.0;
+        
         float xPos = vStartPosition[0] + vStartVelocity[0] * (mTime - vStartTime);
         float yPos = vStartPosition[1] + vStartVelocity[1] * (mTime - vStartTime) + 0.5 * gravity * (mTime - vStartTime)*(mTime - vStartTime);
+        float explosionTime = vStartTime - vStartVelocity[1]/gravity;
+        vec4 finalColor = vec4(vColor.x,vColor.y,vColor.z,0.0);
+        float mixValue = 0.10;
 
         gl_Position.x = xPos;
         gl_Position.y = yPos;
         gl_Position.z = 0.0;
         gl_Position.w = 1.0;
 
-        gl_PointSize = 5.0;
-
-        fColor = vColor;
+        if(isShrapnel != 0.0)
+            mixValue = mTime - vStartTime;
+        else if(mTime >= explosionTime)
+            mixValue = mTime;
+        
+        fColor = mix(finalColor,vColor, 1.0/(mixValue*10.0));
     }
 </script>
 
