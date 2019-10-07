@@ -23,7 +23,7 @@ void main(){
     attribute vec2 vStartVelocity;
     attribute float vStartTime;
     attribute vec4 vColor;
-    attribute float isShrapnel;
+    attribute float projectileType;
     
     uniform float mTime;
     uniform float gravity;
@@ -44,12 +44,14 @@ void main(){
         gl_Position.z = 0.0;
         gl_Position.w = 1.0;
 
-        if(isShrapnel != 0.0)
-            mixValue = mTime - vStartTime;
-        else if(mTime >= explosionTime)
+        if(projectileType == 2.0)
+            mixValue = (mTime - vStartTime) * 30.0;
+        else if(projectileType == 1.0)
+            mixValue = (mTime - vStartTime) * 20.0;
+        else if (mTime >= explosionTime)
             mixValue = mTime;
         
-        fColor = mix(finalColor,vColor, 1.0/(mixValue*10.0));
+        fColor = mix(finalColor,vColor, 1.0/(mixValue));
     }
 </script>
 

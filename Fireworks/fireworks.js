@@ -3,7 +3,7 @@ var gl;
 
 var startPos, endPos, isDrawing = false, activeRockets = [], canvas;
 var linesProgram, rocketsProgram, lineStartProgram, linesBuffer, rocketBuffer, lineStartBuffer;
-var linePosition, vStartPosition, lineStartPosition, vStartVelocity, vStartTime, vColor, isShrapnel;
+var linePosition, vStartPosition, lineStartPosition, vStartVelocity, vStartTime, vColor, projectileType;
 var time = 0;
 var particlesNumber = 0;
 var spawnInterval = 0;
@@ -65,8 +65,8 @@ window.onload = function init() {
     vColor = gl.getAttribLocation(rocketsProgram,"vColor");
     gl.enableVertexAttribArray(vColor);
     
-    isShrapnel = gl.getAttribLocation(rocketsProgram,"isShrapnel");
-    gl.enableVertexAttribArray(isShrapnel);
+    projectileType = gl.getAttribLocation(rocketsProgram,"projectileType");
+    gl.enableVertexAttribArray(projectileType);
 
     render();
 }
@@ -101,7 +101,7 @@ function bindRockets(){
     gl.vertexAttribPointer(vStartVelocity,2,gl.FLOAT,false,40,8);
     gl.vertexAttribPointer(vStartTime,1,gl.FLOAT,false,40,16);
     gl.vertexAttribPointer(vColor,4,gl.FLOAT,false,40,20)
-    gl.vertexAttribPointer(isShrapnel,4,gl.FLOAT,false,40,36)
+    gl.vertexAttribPointer(projectileType,4,gl.FLOAT,false,40,36)
 }
 
 function render(){
@@ -169,20 +169,25 @@ function keypressEvent(event){
 
 
 //  CLASSES
+/**
+ * ProjectileType = 0.0, se for o foguete
+ * ProjectileType = 1.0, se for um fragmento
+ * ProjectileType = 2.0, se for um fragmento de ejecao
+ */
 class Projectile{
-    constructor(startPos, velocity,spawnTime = time,color = vec4(Math.random(),Math.random(),Math.random(),1.0),isShrapnel = 0.0){
+    constructor(startPos, velocity,spawnTime = time,color = vec4(Math.random(),Math.random(),Math.random(),1.0),projectileType = 0.0){
         this.startPos = startPos;
         this.velocity = velocity;
         this.startTime = spawnTime;
         this.color = color;
-        this.isShrapnel = isShrapnel
+        this.projectileType = projectileType;
     }
 
 
 
     getInfo(){
         return [this.startPos[0],this.startPos[1],this.velocity[0],this.velocity[1],this.startTime,
-                    this.color[0],this.color[1],this.color[2],this.color[3], this.isShrapnel];
+                    this.color[0],this.color[1],this.color[2],this.color[3], this.projectileType];
     }
 
     getColor(){
@@ -217,9 +222,16 @@ class Rocket extends Projectile{
         this.secondLevelShrapnel = this.generateRandomShrapnel(false);
         this.explodedFirst = false;
         this.explodedSecond = false;
+        this.ejectionCounter = Math.PI/2.0;
     }
 
     firstExplosion(){
+        
+        if(!this.explodedFirst && Math.cos(this.ejectionCounter/(time-this.getTime() * 2.0)) < 0)
+            this.ejectFragment();
+        
+        this.ejectionCounter += 0.09;
+
         if(time >= this.explosionTime && !this.explodedFirst){
             gl.useProgram(rocketsProgram)
             gl.bindBuffer(gl.ARRAY_BUFFER, rocketBuffer);
@@ -239,7 +251,30 @@ class Rocket extends Projectile{
                gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(x.getInfo()));
          });
          this.explodedSecond = true;   
+         activeRockets.shift();
         }
+    }
+
+    ejectFragment(){
+        gl.useProgram(rocketsProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
+
+        var xPos = this.getStartPos()[0] + this.getStartVelocity()[0]*(time-this.getTime());
+        var yPos = this.getStartPos()[1] + this.getStartVelocity()[1]*(time-this.getTime())
+                                         + 0.5*GRAVITY*Math.pow((time - this.getTime()),2.0);
+
+        var xVel = Math.random() *this.getStartVelocity()[0];
+        var yVel = -2.0 * (this.getStartVelocity()[1] + GRAVITY*(time-this.getTime()));
+
+        var s = new Shrapnel(vec2(xPos,yPos), vec2(xVel,yVel), time,this.getColor(),2.0);
+
+        gl.bufferSubData(gl.ARRAY_BUFFER,(particlesNumber++ * 10*4)%(maxParticles*10*4),flatten(s.getInfo()));
+           
+        s = new Shrapnel(vec2(xPos,yPos), vec2(-1* xVel,yVel),time,this.getColor(),2.0);
+        
+        gl.bufferSubData(gl.ARRAY_BUFFER,(particlesNumber++ * 10*4)%(maxParticles*10*4),flatten(s.getInfo()));
+
+        console.log(s);
     }
 
     calculateExplosionPos(deltaTime){
@@ -276,11 +311,26 @@ class Rocket extends Projectile{
 
         var numberOfShrapnel = Math.floor(Math.random() * 240) + 10;
         for( var i = 0; i < numberOfShrapnel; i++){
-           shrapnel.push(new Shrapnel(expPos,expTime,this.getColor()));
+           shrapnel.push(new Shrapnel(expPos,null,expTime,this.getColor(),1.0));
         }
 
         return shrapnel;
     }
+
+
+    /*generateRandomShrapnel(first){
+        let shrapnel = [];
+        let x = this.firstExplosionPos[0];
+        let y = this.firstExplosionPos[1] - 0.1;
+        shrapnel.push(new Shrapnel(vec2(x,y),vec2(x-this.firstExplosionPos[0],y-this.firstExplosionPos[1]),this.expTime,this.getColor()));
+        
+        x = this.firstExplosionPos[0]
+        y = this.firstExplosionPos[1] - 0.2
+        shrapnel.push(new Shrapnel(vec2(x,y),vec2(x-this.firstExplosionPos[0],y-this.firstExplosionPos[1]),this.expTime,this.getColor()));
+
+
+        return shrapnel;
+    }*/
 
     getShrapnel(){
         return this.firstLevelShrapnel;
@@ -288,10 +338,16 @@ class Rocket extends Projectile{
 }
 
 class Shrapnel extends Projectile{
-    constructor(position,startTime,color){
-        var angle = Math.random()*2*Math.PI;
-        var radius = Math.random()*0.4;
+    constructor(position,velocity,startTime,color,projectileType){
+        let v = 0;
+        if(velocity == null){
+            var angle = Math.random()*2*Math.PI;
+            var radius = Math.random()*0.4;
+            v = vec2(Math.cos(angle)*radius,Math.sin(angle)*radius)
+        }
+        else
+            v = velocity
 
-        super(position, vec2(Math.cos(angle)*radius,Math.sin(angle)*radius),startTime,color,1.0);
+        super(position,v,startTime,color,projectileType);
     }
 }
