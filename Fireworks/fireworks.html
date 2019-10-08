@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet"> 
 <script id="lineVertex-shader" type="x-shader/x-vertex">
 attribute vec4 vPosition;
 void main(){
@@ -88,10 +89,30 @@ void main() {
 <script type="text/javascript" src="../Common/MV.js"></script>
 <script type="text/javascript" src="fireworks.js"></script>
 </head>
-<body>
+<body style = "font-family: 'Roboto', sans-serif">
     <title>Fireworks</title>
+    <span>Time Elapsed:</span> <input type="text" id="timeElapsed" style = "border : none" value="Error" size = 4 readonly>
+    <p>
+    <span size = 10>Buffer State:</span> <input type="text" id="bufferState" style = "border : none" value="Error" size = 10 readonly>
+    <p>
     <canvas id="gl-canvas" width="500" height=500>
         HTML5 Canvas not supported"
     </canvas>
+    <p>
+    <DIV ID="settings" STYLE="position: fixed; top: 0px; right: 55%; height: 100%; width: 350px;">
+        <center><h1>Settings</center></h1>
+        <center>Time: <input type="text" id="timeSpeed" style = "border : none; font-weight: bold" value="" size = 4 readonly>
+        <div class="slidecontainer">
+            0.2x<input type="range" min="1" max="10" value="5" class="slider" id="timeSlider">2x
+        </div></center>
+        <p>
+       <center> Autofire Frequency : Every <input type="text" id="autofireRate" style = "border : none; font-weight: bold" value="" size = 4 readonly>seconds
+        <div class="slidecontainer">
+                1<input type="range" min="1" max="60" value="1" class="slider" id="autofireSlider">60
+        </div></center>
+        <center> Explosion Radius :  <input type="text" id="explosionRadius" style = "border : none; font-weight: bold" value="" size=1 readonly> * radius
+        <div class="slidecontainer">
+                0.2x<input type="range" min="1" max="25" value="" class="slider" id="radiusSlider">5x
+        </div></center>
 </body>
 </html>

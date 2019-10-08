@@ -8,6 +8,9 @@ var time = 0;
 var particlesNumber = 0;
 var spawnInterval = 0;
 var automode = false;
+var timeSlider;
+var autofireRate;
+var explosionRadius;
 
 
 //  CONSTANTS
@@ -18,10 +21,14 @@ const maxParticles = 65000;
 //  MAIN
 window.onload = function init() {
     canvas = document.getElementById("gl-canvas");
+    autofireRate = document.getElementById("autofireSlider");
+    timeSlider = document.getElementById("timeSlider");
+    explosionRadius = document.getElementById("radiusSlider");
     canvas.addEventListener("mousedown", mouseDown);
     canvas.addEventListener("mouseup", mouseUp);
     canvas.addEventListener("mousemove", mouseMovement);
     canvas.parentElement.addEventListener("keypress",keypressEvent);
+    this.document.body.addEventListener("keypress",keypressEvent);
 
     gl = WebGLUtils.setupWebGL(canvas);
     gl.enable(gl.BLEND);
@@ -103,10 +110,16 @@ function bindRockets(){
 }
 
 function render(){
-    time += 1/60;
+    document.getElementById('timeSpeed').value= (this.timeSlider.value/5) + "x" ; 
+    document.getElementById('timeElapsed').value = this.time.toFixed(2) + "s";
+    document.getElementById('bufferState').value = this.particlesNumber % maxParticles + "/" + maxParticles;
+    document.getElementById('autofireRate').value= (1 / this.autofireRate.value).toFixed(4);
+    document.getElementById('explosionRadius').value= (this.explosionRadius.value / 5).toFixed(2);
+    time += 1/(60 * 5 / this.timeSlider.value);
     gl.clear(gl.COLOR_BUFFER_BIT);
     
-    if(automode && spawnInterval++ % 10 == 0 )
+    //demasiado smol brian para meter a variar com o tempo
+    if(automode && spawnInterval++ % (61 - this.autofireRate.value) == 0 )
         autoSpawn();
     
     if(isDrawing){
@@ -119,7 +132,10 @@ function render(){
         
     }
     bindRockets();
-    gl.drawArrays(gl.POINTS, 0, particlesNumber);
+    if(particlesNumber < maxParticles)
+        gl.drawArrays(gl.POINTS, 0, particlesNumber);
+    else
+        gl.drawArrays(gl.POINTS, 0, maxParticles - 1);
     activeRockets.filter(x => x.firstExplosion());
     activeRockets.filter(x => x.secondExplosion());
     
@@ -345,7 +361,7 @@ class Shrapnel extends Projectile{
         let v = 0;
         if(velocity == null){
             var angle = Math.random()*2*Math.PI;
-            var radius = Math.random()*0.4;
+            var radius = Math.random()* 0.4 * (explosionRadius.value / 5);
             v = vec2(Math.cos(angle)*radius,Math.sin(angle)*radius)
         }
         else
