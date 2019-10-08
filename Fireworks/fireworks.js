@@ -11,6 +11,7 @@ var automode = false;
 var timeSlider;
 var autofireRate;
 var explosionRadius;
+var shrapnelMultiplier;
 
 
 //  CONSTANTS
@@ -24,6 +25,7 @@ window.onload = function init() {
     autofireRate = document.getElementById("autofireSlider");
     timeSlider = document.getElementById("timeSlider");
     explosionRadius = document.getElementById("radiusSlider");
+    shrapnelMultiplier = document.getElementById("shrapnelSlider");
     canvas.addEventListener("mousedown", mouseDown);
     canvas.addEventListener("mouseup", mouseUp);
     canvas.addEventListener("mousemove", mouseMovement);
@@ -112,9 +114,11 @@ function bindRockets(){
 function render(){
     document.getElementById('timeSpeed').value= (this.timeSlider.value/5) + "x" ; 
     document.getElementById('timeElapsed').value = this.time.toFixed(2) + "s";
-    document.getElementById('bufferState').value = this.particlesNumber % maxParticles + "/" + maxParticles;
+    document.getElementById('bufferState').value = this.particlesNumber % maxParticles;
     document.getElementById('autofireRate').value= (1 / this.autofireRate.value).toFixed(4);
     document.getElementById('explosionRadius').value= (this.explosionRadius.value / 5).toFixed(2);
+    document.getElementById('shrapnelMultiplier').value= (this.shrapnelMultiplier.value / 2).toFixed(2);
+
     time += 1/(60 * 5 / this.timeSlider.value);
     gl.clear(gl.COLOR_BUFFER_BIT);
     
@@ -323,7 +327,7 @@ class Rocket extends Projectile{
         let secondShrapnel = []
         let t = this.explosionTime + 0.7;
         
-        let numberOfShrapnel = Math.floor(Math.random() * 3) + 2;
+        let numberOfShrapnel = Math.floor((Math.random() * 3 + 2) * (shrapnelMultiplier.value / 2));
         this.firstLevelShrapnel.forEach(element => {
             for (let i = 0; i<numberOfShrapnel;i++){
                 let x = element.getStartPos()[0] + element.getStartVelocity()[0]*(t - element.getTime());
@@ -366,7 +370,6 @@ class Shrapnel extends Projectile{
         }
         else
             v = velocity
-
         super(position,v,startTime,color,projectileType);
     }
 }
