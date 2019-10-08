@@ -47,11 +47,9 @@ window.onload = function init() {
     lineStartPosition = gl.getAttribLocation(lineStartProgram, "vPosition");
     gl.enableVertexAttribArray(lineStartPosition);
 
-
-
     gl.useProgram(rocketsProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, 4 * 10 * maxParticles,gl.STATIC_DRAW);   
+    gl.bufferData(gl.ARRAY_BUFFER, 4 * 10 * maxParticles,gl.STATIC_DRAW); 
     
     vStartPosition = gl.getAttribLocation(rocketsProgram,"vStartPosition");
     gl.enableVertexAttribArray(vStartPosition);
@@ -108,7 +106,7 @@ function render(){
     time += 1/60;
     gl.clear(gl.COLOR_BUFFER_BIT);
     
-    if(automode && spawnInterval++ % 6 == 0 )
+    if(automode && spawnInterval++ % 10 == 0 )
         autoSpawn();
     
     if(isDrawing){
@@ -218,20 +216,21 @@ class Rocket extends Projectile{
         this.secondExplosionPos = this.calculateExplosionPos(this.deltaTime);
 
         this.explosionVel = this.calculateExplosionVelocity();
-        this.firstLevelShrapnel = this.generateRandomShrapnel(true);
-        this.secondLevelShrapnel = this.generateRandomShrapnel(false);
+        this.firstLevelShrapnel = this.generateFirstShrapnel();
+        this.secondLevelShrapnel = this.generateSecondShrapnel();
         this.explodedFirst = false;
         this.explodedSecond = false;
         this.ejectionCounter = Math.PI/2.0;
+        this.isMortar = (Math.random() < 0.5)
     }
 
     firstExplosion(){
         
-        if(!this.explodedFirst && Math.cos(this.ejectionCounter/(time-this.getTime() * 2.0)) < 0)
+        if(!this.isMortar && !this.explodedFirst && Math.sin(this.ejectionCounter/((time-this.getTime()) * 2.5)) < 0)
             this.ejectFragment();
         
-        this.ejectionCounter += 0.09;
-
+        this.ejectionCounter += 0.1;
+        
         if(time >= this.explosionTime && !this.explodedFirst){
             gl.useProgram(rocketsProgram)
             gl.bindBuffer(gl.ARRAY_BUFFER, rocketBuffer);
@@ -273,8 +272,6 @@ class Rocket extends Projectile{
         s = new Shrapnel(vec2(xPos,yPos), vec2(-1* xVel,yVel),time,this.getColor(),2.0);
         
         gl.bufferSubData(gl.ARRAY_BUFFER,(particlesNumber++ * 10*4)%(maxParticles*10*4),flatten(s.getInfo()));
-
-        console.log(s);
     }
 
     calculateExplosionPos(deltaTime){
@@ -295,28 +292,34 @@ class Rocket extends Projectile{
     /**
      * first = true se for a primeira explosao
      */
-    generateRandomShrapnel(first){
+    generateFirstShrapnel(){
         let shrapnel = [];
-        let expPos;
-        let expTime;
-
-        if(first){
-            expPos = this.firstExplosionPos;
-            expTime = this.explosionTime;
-        }else{
-            expPos = this.secondExplosionPos;
-            expTime = this.explosionTime + this.deltaTime;
-
-        }
 
         var numberOfShrapnel = Math.floor(Math.random() * 240) + 10;
         for( var i = 0; i < numberOfShrapnel; i++){
-           shrapnel.push(new Shrapnel(expPos,null,expTime,this.getColor(),1.0));
+           shrapnel.push(new Shrapnel(this.firstExplosionPos,null,this.explosionTime,this.getColor(),1.0));
         }
 
         return shrapnel;
     }
 
+    generateSecondShrapnel(){
+        let secondShrapnel = []
+        let t = this.explosionTime + 0.7;
+        
+        let numberOfShrapnel = Math.floor(Math.random() * 3) + 2;
+        this.firstLevelShrapnel.forEach(element => {
+            for (let i = 0; i<numberOfShrapnel;i++){
+                let x = element.getStartPos()[0] + element.getStartVelocity()[0]*(t - element.getTime());
+                let y = element.getStartPos()[1] + element.getStartVelocity()[1]*(t - element.getTime()) 
+                                               + 0.5 * GRAVITY * Math.pow((t - element.getTime()),2.0);
+
+                secondShrapnel.push(new Shrapnel(vec2(x,y),null,t,this.getColor(),1.0));
+            }
+        });
+
+        return secondShrapnel;
+    }
 
     /*generateRandomShrapnel(first){
         let shrapnel = [];
