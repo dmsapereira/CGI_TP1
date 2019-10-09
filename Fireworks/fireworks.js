@@ -147,10 +147,12 @@ function render(){
 }
 
 function autoSpawn(){
-    startPos = vec2(-1 + Math.random()*2, -0.9);
-    endPos = vec2(startPos[0] + Math.random()*0.2, startPos[1] + 0.9 + Math.random()*0.5);
-
-    mouseUp();
+    var posX = vec2(-1 + Math.random()*2, -0.9);
+    var posY = vec2(posX[0] + Math.random()*0.2, posX[1] + 0.9 + Math.random()*0.5);
+    var rocket = new Rocket(posX, posY);
+    activeRockets.push(rocket);
+    gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(rocket.getInfo()));
 }
 //  EVENTS
 
@@ -168,9 +170,6 @@ function mouseUp(event){
     gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
     var rocket = new Rocket(startPos, endPos);
     activeRockets.push(rocket);
-
-
-
     gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(rocket.getInfo()));
 }
 
