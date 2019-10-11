@@ -3,9 +3,10 @@ var gl;
 
 var startPos, endPos, isDrawing = false, activeRockets = [], canvas;
 var linesProgram, rocketsProgram, lineStartProgram, linesBuffer, rocketBuffer, lineStartBuffer;
-var linePosition, vStartPosition, lineStartPosition, vStartVelocity, vStartTime, vColor, projectileType;
+var linePosition, vStartPosition, lineStartPosition, vStartVelocity, vStartTime, vColor, projectileType, timeLoc, gravityLoc;
 var time = 0;
 var particlesNumber = 0;
+var activeParticlesNumber = 0;
 var spawnInterval = 0;
 var automode = false;
 var timeSlider;
@@ -75,6 +76,9 @@ window.onload = function init() {
     projectileType = gl.getAttribLocation(rocketsProgram,"projectileType");
     gl.enableVertexAttribArray(projectileType);
 
+    timeLoc = gl.getUniformLocation(rocketsProgram,"mTime");
+    gravityLoc = gl.getUniformLocation(rocketsProgram,"gravity");
+
     render();
 }
 
@@ -102,8 +106,8 @@ function bindRockets(){
     gl.useProgram(rocketsProgram);
     //gl.bufferData(gl.ARRAY_BUFFER,flatten(activeProjectiles.flatMap(x => x.getInfo())),gl.STATIC_DRAW);
 
-    gl.uniform1f(gl.getUniformLocation(rocketsProgram,"mTime"),time);
-    gl.uniform1f(gl.getUniformLocation(rocketsProgram,"gravity"), GRAVITY);
+    gl.uniform1f(timeLoc,time);
+    gl.uniform1f(gravityLoc, GRAVITY);
     gl.vertexAttribPointer(vStartPosition,2,gl.FLOAT,false,40,0);
     gl.vertexAttribPointer(vStartVelocity,2,gl.FLOAT,false,40,8);
     gl.vertexAttribPointer(vStartTime,1,gl.FLOAT,false,40,16);
@@ -136,12 +140,29 @@ function render(){
         
     }
     bindRockets();
-    if(particlesNumber < maxParticles)
-        gl.drawArrays(gl.POINTS, 0, particlesNumber);
+
+    activeRockets.forEach(x => x.firstExplosion());
+    activeRockets.forEach(x => x.secondExplosion());
+    
+    for(;activeRockets.length != 0 && time >= activeRockets[0].getDeathTime() + 2.0;){
+        activeRockets.shift();
+    
+        offset += activeRockets[0].getTotalProjectileCount();
+    }
+    
+
+    if(activeRockets.length != 0 && time >= activeRockets[0].getTime() + 5.0){
+        particlesNumber -= activeRockets[0].getTotalProjectileCount();
+        offset += activeRockets[0].getTotalProjectileCount();
+        
+        if(offset >= maxParticles)
+            offset = offset - maxParticles;
+    }
+    
+    if(offset+particlesNumber > maxParticles)
+    gl.drawArrays(gl.POINTS, offset, particlesNumber);
     else
         gl.drawArrays(gl.POINTS, 0, maxParticles - 1);
-    activeRockets.filter(x => x.firstExplosion());
-    activeRockets.filter(x => x.secondExplosion());
     
     requestAnimationFrame(render);
 }
@@ -153,6 +174,9 @@ function autoSpawn(){
     activeRockets.push(rocket);
     gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(rocket.getInfo()));
+    
+    if(activeParticlesNumber < maxParticles)
+        activeParticlesNumber++;
 }
 //  EVENTS
 
@@ -171,6 +195,8 @@ function mouseUp(event){
     var rocket = new Rocket(startPos, endPos);
     activeRockets.push(rocket);
     gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(rocket.getInfo()));
+    if (activeParticlesNumber < maxParticles)
+        activeParticlesNumber++;
 }
 
 function mouseMovement(event){
@@ -228,7 +254,7 @@ class Rocket extends Projectile{
     constructor(startPos, endPos){
         super(startPos, vec2(endPos[0] - startPos[0], endPos[1] - startPos[1]));
         this.explosionTime = this.getTime() + (-1 * this.getStartVelocity()[1]/ GRAVITY); //we calculate when the velocity in the Y component is 0 ^^
-        this.deltaTime = 0.7;
+        this.deltaTime = 1.0;
 
 
         this.firstExplosionPos = this.calculateExplosionPos(0.0);
@@ -241,6 +267,14 @@ class Rocket extends Projectile{
         this.explodedSecond = false;
         this.ejectionCounter = Math.PI/2.0;
         this.isMortar = (Math.random() < 0.5)
+    }
+
+    getDeathTime(){
+        return this.explosionTime + this.deltaTime + 1.5;
+    }
+
+    getTotalProjectileCount(){
+        return 1 + this.firstLevelShrapnel.length + this.secondLevelShrapnel.length;
     }
 
     firstExplosion(){
@@ -324,7 +358,7 @@ class Rocket extends Projectile{
 
     generateSecondShrapnel(){
         let secondShrapnel = []
-        let t = this.explosionTime + 0.7;
+        let t = this.explosionTime + this.deltaTime;
         
         let numberOfShrapnel = Math.floor((Math.random() * 3 + 2) * (shrapnelMultiplier.value / 2));
         this.firstLevelShrapnel.forEach(element => {
