@@ -1,3 +1,9 @@
+/*
+*@authors
+*David Pereira - 52890
+*Filie José - Le Monke
+*/
+
 //  GLOBALS VARIABLES
 var gl;
 
@@ -6,13 +12,13 @@ var linesProgram, rocketsProgram, lineStartProgram, linesBuffer, rocketBuffer, l
 var linePosition, vStartPosition, lineStartPosition, vStartVelocity, vStartTime, vColor, projectileType, timeLoc, gravityLoc;
 var time = 0;
 var particlesNumber = 0;
-var activeParticlesNumber = 0;
 var spawnInterval = 0;
 var automode = false;
 var timeSlider;
 var autofireRate;
 var explosionRadius;
 var shrapnelMultiplier;
+var offset = 0;
 
 
 //  CONSTANTS
@@ -118,7 +124,7 @@ function bindRockets(){
 function render(){
     document.getElementById('timeSpeed').value= (this.timeSlider.value/5) + "x" ; 
     document.getElementById('timeElapsed').value = this.time.toFixed(2) + "s";
-    document.getElementById('bufferState').value = this.particlesNumber % maxParticles;
+    document.getElementById('bufferState').value = offset;
     document.getElementById('autofireRate').value= (1 / this.autofireRate.value).toFixed(4);
     document.getElementById('explosionRadius').value= (this.explosionRadius.value / 5).toFixed(2);
     document.getElementById('shrapnelMultiplier').value= (this.shrapnelMultiplier.value / 2).toFixed(2);
@@ -145,25 +151,23 @@ function render(){
     activeRockets.forEach(x => x.secondExplosion());
     
     for(;activeRockets.length != 0 && time >= activeRockets[0].getDeathTime() + 2.0;){
+        offset = activeRockets[0].getIndex();
         activeRockets.shift();
-    
-        offset += activeRockets[0].getTotalProjectileCount();
     }
     
+    if(offset + particlesNumber >= maxParticles){
+        gl.drawArrays(gl.POINTS, offset, maxParticles - offset - 1);
+        if(particlesNumber >= maxParticles)
+            gl.drawArrays(gl.POINTS, 0, maxParticles - 1);
+        else
+            gl.drawArrays(gl.POINTS, 0, particlesNumber);
+    }else{
+        if(particlesNumber >= maxParticles)
+            gl.drawArrays(gl.POINTS, offset, maxParticles - 1);
+        else
+            gl.drawArrays(gl.POINTS, offset, particlesNumber);
+    }
 
-    if(activeRockets.length != 0 && time >= activeRockets[0].getTime() + 5.0){
-        particlesNumber -= activeRockets[0].getTotalProjectileCount();
-        offset += activeRockets[0].getTotalProjectileCount();
-        
-        if(offset >= maxParticles)
-            offset = offset - maxParticles;
-    }
-    
-    if(offset+particlesNumber > maxParticles)
-    gl.drawArrays(gl.POINTS, offset, particlesNumber);
-    else
-        gl.drawArrays(gl.POINTS, 0, maxParticles - 1);
-    
     requestAnimationFrame(render);
 }
 
@@ -174,9 +178,6 @@ function autoSpawn(){
     activeRockets.push(rocket);
     gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(rocket.getInfo()));
-    
-    if(activeParticlesNumber < maxParticles)
-        activeParticlesNumber++;
 }
 //  EVENTS
 
@@ -195,8 +196,6 @@ function mouseUp(event){
     var rocket = new Rocket(startPos, endPos);
     activeRockets.push(rocket);
     gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(rocket.getInfo()));
-    if (activeParticlesNumber < maxParticles)
-        activeParticlesNumber++;
 }
 
 function mouseMovement(event){
@@ -266,20 +265,21 @@ class Rocket extends Projectile{
         this.explodedFirst = false;
         this.explodedSecond = false;
         this.ejectionCounter = Math.PI/2.0;
-        this.isMortar = (Math.random() < 0.5)
+        this.isMortar = (Math.random() < 0.5);
+        this.index = particlesNumber%maxParticles;
     }
 
     getDeathTime(){
         return this.explosionTime + this.deltaTime + 1.5;
     }
 
-    getTotalProjectileCount(){
-        return 1 + this.firstLevelShrapnel.length + this.secondLevelShrapnel.length;
+    getIndex(){
+        return this.index;
     }
 
     firstExplosion(){
         
-        if(!this.isMortar && !this.explodedFirst && Math.sin(this.ejectionCounter/((time-this.getTime()) * 2.5)) < 0)
+        if(!this.isMortar && !this.explodedFirst)
             this.ejectFragment();
         
         this.ejectionCounter += 0.1;
@@ -303,7 +303,6 @@ class Rocket extends Projectile{
                gl.bufferSubData(gl.ARRAY_BUFFER, (particlesNumber++ * (10 * 4))%(maxParticles*(10*4)), flatten(x.getInfo()));
          });
          this.explodedSecond = true;   
-         activeRockets.shift();
         }
     }
 
@@ -400,8 +399,7 @@ class Shrapnel extends Projectile{
             var angle = Math.random()*2*Math.PI;
             var radius = Math.random()* 0.4 * (explosionRadius.value / 5);
             v = vec2(Math.cos(angle)*radius,Math.sin(angle)*radius)
-        }
-        else
+        }else
             v = velocity
         super(position,v,startTime,color,projectileType);
     }
