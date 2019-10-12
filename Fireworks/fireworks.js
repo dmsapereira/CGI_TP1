@@ -1,24 +1,120 @@
 /*
 *@authors
 *David Pereira - 52890
-*Filie José - Le Monke
+*Filie José - 53277
 */
 
 //  GLOBALS VARIABLES
 var gl;
 
-var startPos, endPos, isDrawing = false, activeRockets = [], canvas;
-var linesProgram, rocketsProgram, lineStartProgram, linesBuffer, rocketBuffer, lineStartBuffer;
-var linePosition, vStartPosition, lineStartPosition, vStartVelocity, vStartTime, vColor, projectileType, timeLoc, gravityLoc;
+/**
+ * mouse position upon mouseDown
+ */
+var startPos
+
+/**
+ * mouse position upon mouseMove
+ */
+var endPos; 
+
+/**
+ * Current offset for reading bufferData
+ */
+var offset = 0;
+
+
+/**
+ * checks if we're drawing a line or not
+ */
+var isDrawing = false; 
+
+/**
+ * currently drawn rockets
+ */
+var activeRockets = []; 
+
+/**
+ * HTML Canvas element
+ */
+var canvas; 
+
+/**
+ * program for the line
+ */
+var linesProgram;
+
+/**
+ * program for the rockets/shrapnel/trails
+ */
+var rocketsProgram  
+
+/**
+ * program for the rocket that appears while we're drawing
+ */
+var lineStartProgram; 
+
+/**
+ * buffer for the two points that define the line
+ */
+var linesBuffer; 
+
+/**
+ * buffer for all the rockets/shrapnel/trails
+ */
+var rocketBuffer; 
+
+/**
+ * buffer for the single point thats rendered upon the mouseDown event
+ */
+var lineStartBuffer;
+
+/*
+ * Attributes
+ */
+var linePosition;
+var vStartPosition;
+var lineStartPosition;
+var vStartVelocity;
+var vStartTime;
+var vColor;
+var projectileType;
+
+/*
+* Uniforms
+*/
+var timeLoc;
+var gravityLoc;
+
+/**
+ * Time counter. Basically simulates time
+ */
 var time = 0;
+
+/**
+ * Counter thats incremented everytime a particle is created. Never decremented but is used
+ * with a modulus with maxParticles
+ */
 var particlesNumber = 0;
+
+/**
+ * Counter thats used for calculating the interval between automatic launches
+ */
 var spawnInterval = 0;
+
+/**
+ * Are we auto launching?
+ */
 var automode = false;
+
+/*
+* HTML Information Elements
+*/
 var timeSlider;
 var autofireRate;
 var explosionRadius;
 var shrapnelMultiplier;
-var offset = 0;
+
+
 
 
 //  CONSTANTS
@@ -90,6 +186,9 @@ window.onload = function init() {
 
 //  FUNCTIONS
 
+/**
+ * Changes the WebGL context to the Line
+ */
 function bindLine(){
     gl.useProgram(linesProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, linesBuffer);
@@ -99,7 +198,9 @@ function bindLine(){
     gl.vertexAttribPointer(linePosition, 2, gl.FLOAT, false, 0, 0);
 }
 
-
+/**
+ * Changes the WebGL context to the line's point 
+ */
 function bindLineStart(){
     gl.useProgram(lineStartProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, lineStartBuffer);
@@ -107,6 +208,10 @@ function bindLineStart(){
 
     gl.vertexAttribPointer(lineStartPosition,2,gl.FLOAT,false,0,0);
 }
+
+/**
+ * Changes the WebGL context to the rockets/shrapnel/trails
+ */
 function bindRockets(){
     gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
     gl.useProgram(rocketsProgram);
@@ -121,6 +226,7 @@ function bindRockets(){
     gl.vertexAttribPointer(projectileType,4,gl.FLOAT,false,40,36)
 }
 
+
 function render(){
     document.getElementById('timeSpeed').value= (this.timeSlider.value/5) + "x" ; 
     document.getElementById('timeElapsed').value = this.time.toFixed(2) + "s";
@@ -129,10 +235,12 @@ function render(){
     document.getElementById('explosionRadius').value= (this.explosionRadius.value / 5).toFixed(2);
     document.getElementById('shrapnelMultiplier').value= (this.shrapnelMultiplier.value / 2).toFixed(2);
 
+    //simulates the flow of time. Altered via the slider in the HTML
     time += 1/(60 * 5 / this.timeSlider.value);
     gl.clear(gl.COLOR_BUFFER_BIT);
     
-    //demasiado smol brian para meter a variar com o tempo
+    //Do we want to autospawn?
+    //2nd part of the condition is for defining the launch interval
     if(automode && spawnInterval++ % (61 - this.autofireRate.value) == 0 )
         autoSpawn();
     
@@ -147,9 +255,11 @@ function render(){
     }
     bindRockets();
 
+    // if a rocket has exploded, that explosion's effects will be calculated here
     activeRockets.forEach(x => x.firstExplosion());
     activeRockets.forEach(x => x.secondExplosion());
     
+    //Periodically changes the offset for drawing so that we don't draw unecessary particles
     for(;activeRockets.length != 0 && time >= activeRockets[0].getDeathTime() + 2.0;){
         offset = activeRockets[0].getIndex();
         activeRockets.shift();
@@ -171,6 +281,9 @@ function render(){
     requestAnimationFrame(render);
 }
 
+/**
+ * Pushes a new rocket when it's autospawn origined
+ */
 function autoSpawn(){
     var posX = vec2(-1 + Math.random()*2, -0.9);
     var posY = vec2(posX[0] + Math.random()*0.2, posX[1] + 0.9 + Math.random()*0.5);
@@ -269,14 +382,23 @@ class Rocket extends Projectile{
         this.index = particlesNumber%maxParticles;
     }
 
+    /**
+     * Returns the time at which we can be sure all the rocket's particles will have been gone
+     */
     getDeathTime(){
         return this.explosionTime + this.deltaTime + 1.5;
     }
 
+    /**
+     * Returns the rockets index in the rockets array
+     */
     getIndex(){
         return this.index;
     }
 
+    /**
+     * Explodes the rocket, launching the first level shrapnel into the air
+     */
     firstExplosion(){
         
         if(!this.isMortar && !this.explodedFirst)
@@ -295,6 +417,9 @@ class Rocket extends Projectile{
          
     }
 
+    /**
+     * Explodes the rocket's first level shrapnel launching further shrapnel into the air
+     */
     secondExplosion(){
         if(time >= this.explosionTime + this.deltaTime && !this.explodedSecond){
             gl.useProgram(rocketsProgram)
@@ -306,6 +431,9 @@ class Rocket extends Projectile{
         }
     }
 
+    /**
+     * Ejects the rocket's trail particles. 2 at a time
+     */
     ejectFragment(){
         gl.useProgram(rocketsProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER,rocketBuffer);
@@ -326,6 +454,10 @@ class Rocket extends Projectile{
         gl.bufferSubData(gl.ARRAY_BUFFER,(particlesNumber++ * 10*4)%(maxParticles*10*4),flatten(s.getInfo()));
     }
 
+    /**
+     * Calculates the position of the rocket at the deltaTime
+     * @param {*} deltaTime 
+     */
     calculateExplosionPos(deltaTime){
         let x = this.getStartPos()[0] + this.getStartVelocity()[0]*(this.explosionTime - this.getTime() + deltaTime);
         let y = this.getStartPos()[1] + this.getStartVelocity()[1]*(this.explosionTime - this.getTime() + deltaTime) 
@@ -334,6 +466,9 @@ class Rocket extends Projectile{
         return vec2(x,y);
     }
     
+    /**
+     * Returns the rocket's velocity at the time of explosion
+     */
     calculateExplosionVelocity(){
        let vx = this.getStartVelocity()[0];
        let vy = 0;
@@ -342,7 +477,7 @@ class Rocket extends Projectile{
     }
 
     /**
-     * first = true se for a primeira explosao
+     * Used on the constructor only. Generates the shrapnel that will be launched upon the first explosion
      */
     generateFirstShrapnel(){
         let shrapnel = [];
@@ -355,6 +490,9 @@ class Rocket extends Projectile{
         return shrapnel;
     }
 
+    /**
+     * Used on the constructor only. Generates the shrapnel that will be launched upon the second explosion
+     */
     generateSecondShrapnel(){
         let secondShrapnel = []
         let t = this.explosionTime + this.deltaTime;
@@ -373,25 +511,17 @@ class Rocket extends Projectile{
         return secondShrapnel;
     }
 
-    /*generateRandomShrapnel(first){
-        let shrapnel = [];
-        let x = this.firstExplosionPos[0];
-        let y = this.firstExplosionPos[1] - 0.1;
-        shrapnel.push(new Shrapnel(vec2(x,y),vec2(x-this.firstExplosionPos[0],y-this.firstExplosionPos[1]),this.expTime,this.getColor()));
-        
-        x = this.firstExplosionPos[0]
-        y = this.firstExplosionPos[1] - 0.2
-        shrapnel.push(new Shrapnel(vec2(x,y),vec2(x-this.firstExplosionPos[0],y-this.firstExplosionPos[1]),this.expTime,this.getColor()));
-
-
-        return shrapnel;
-    }*/
-
+    /**
+     * Returns the first level shrapnel
+     */
     getShrapnel(){
         return this.firstLevelShrapnel;
     }
 }
 
+/**
+ * Represents the shrapnel. Be they first level, second level, or a trail
+ */
 class Shrapnel extends Projectile{
     constructor(position,velocity,startTime,color,projectileType){
         let v = 0;
